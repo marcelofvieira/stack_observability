@@ -1,0 +1,47 @@
+version: '3.7'
+
+networks:
+    front-tier:
+    back-tier:
+    
+services:
+       
+    genericservice1:
+        build: './genericservice'
+        container_name: genericservice_01
+        networks:
+            - back-tier
+            - front-tier
+        ports:
+            - "7001:9005"
+        env_file:
+            - ./genericservice/env/01_environment.config
+
+
+    genericservice2:
+        build: './genericservice'
+        container_name: genericservice_02
+        networks:
+            - back-tier
+            - front-tier
+        ports:
+            - "7002:9005"
+        env_file:
+            - ./genericservice/env/02_environment.config
+
+
+    genericservice3:
+        build: './genericservice'
+        container_name: genericservice_03
+        networks:
+            - back-tier
+            - front-tier
+        ports:
+            - "7003:9005"
+        env_file:
+            - ./genericservice/env/03_environment.config
+        #deploy:
+            #mode: replicated
+            #replicas: 3
+         
+        

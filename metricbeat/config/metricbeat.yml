@@ -1,0 +1,16 @@
+metricbeat.modules:
+- module: docker
+  metricsets: ["container", "cpu", "diskio", "healthcheck", "info", "memory", "network"]
+  hosts: ["unix:///var/run/docker.sock"]
+  period: 10s
+  
+- module: system
+  metricsets: ["cpu", "memory", "network" ]
+  enabled: true
+  period: 15s
+  processes: ['.*']
+  
+- module: prometheus
+  metricsets: ["remote_write"]
+  host: "localhost"
+  port: "9201"

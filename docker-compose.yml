@@ -1,0 +1,148 @@
+version: '3.7'
+
+volumes:
+    prometheus_data: {}
+    grafana_data: {}
+
+networks:
+    front-tier:
+    back-tier:
+
+services:
+
+    prometheus:
+        image: prom/prometheus:v2.1.0
+        container_name: prometheus
+        volumes:
+            - ./prometheus/config:/etc/prometheus
+            - ./prometheus/data/:/prometheus
+        command:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+            - '--web.console.templates=/usr/share/prometheus/consoles'
+        ports:
+            - "9090:9090"
+        links:
+            - cadvisor:cadvisor
+        depends_on:
+            - cadvisor
+            - jaeger
+        networks:
+            - back-tier
+        restart: always
+
+    cadvisor:
+        image: google/cadvisor:v0.33.0
+        container_name: cadvisor
+        volumes:
+          - /:/rootfs:ro
+          - /var/run:/var/run:rw
+          - /sys:/sys:ro
+          - /var/lib/docker/:/var/lib/docker:ro
+        ports:
+          - "8080:8080"
+        networks:
+          - back-tier
+        restart: always
+        privileged: true
+
+    jaeger:
+        image: jaegertracing/all-in-one:1.18
+        container_name: jaeger
+        networks:
+            - back-tier
+            - front-tier
+        expose:
+            - "9411"
+            - "16686"
+            - "14268"
+            - "14269"
+            - "14270"
+            - "14271"
+            - "16687"
+            - "5775"
+        ports:
+            - "9411:9411"
+            - "16686:16686"
+            - "16687:16687"
+            - "14268:14268"
+            - "14269:14269"
+            - "14270:14270"
+            - "14271:14271"
+            - "5775:5775"
+            - "8888:8888"
+        restart: unless-stopped
+        env_file:
+            - ./jaeger/environment.config
+        command:
+            - "--admin-http-port=8888"
+            - "--metrics-backend=prometheus"
+            - "--metrics-http-route=/metrics"
+            - "--es.server-urls=http://elasticsearch:9200"
+            - "--es.num-shards=1"
+            - "--es.num-replicas=0"
+            - "--log-level=error"
+            - "--span-storage.type=elasticsearch"
+            - "--es.tags-as-fields.all=true"
+        depends_on:
+            - cadvisor
+            - elasticsearch
+
+    elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.7.1
+        container_name: elasticsearch
+        networks:
+            - back-tier
+            - front-tier
+        expose:
+            - "9200"
+            - "9300"
+        ports:
+            - "9200:9200"
+            - "9300:9300"
+        restart: unless-stopped
+        volumes:
+            - ./elasticsearch/data/:/usr/share/elasticsearch/data
+        env_file:
+            - ./elasticsearch/environment.config
+
+    grafana:
+        image: grafana/grafana:7.0.3
+        container_name: grafana
+        depends_on:
+            - elasticsearch
+            - prometheus
+        expose:
+            - "3000"
+        ports:
+            - "3000:3000"
+        env_file:
+            - ./grafana/env/config.monitoring        
+        volumes:
+            - ./grafana/provisioning/:/etc/grafana/provisioning/
+            - ./grafana/dashboards/:/var/lib/grafana/dashboards/
+        networks:
+            - back-tier
+            - front-tier
+        restart: always
+            
+    nodeexporter:
+        image: prom/node-exporter:v1.0.1
+        container_name: nodeexporter
+        volumes:
+            - /proc:/host/proc:ro
+            - /sys:/host/sys:ro
+            - /:/rootfs:ro
+        command: 
+            - '--path.procfs=/proc' 
+            - '--path.sysfs=/sys'      
+            - --collector.filesystem.ignored-mount-points
+            - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+        ports:
+            - 9100:9100
+        networks:
+            - back-tier
+        restart: always
+        
+        
